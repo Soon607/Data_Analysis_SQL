@@ -4,4 +4,4 @@
 * Structured vs Unstructured
 * Quantitative vs Qualitative Data
 * First-, Second, and Third-Party Data
-  -Fisrt
+  *Fisrt

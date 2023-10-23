@@ -28,7 +28,7 @@ Distribution allows us to understand the range of values that exist in the data 
 * Frequency checks can be done on any data type(strings, numerics, dates, and booleans)
 * Frequency queries are a great way to detect sparse data
 * Frequency Query
-  ```postgre sql
+  ```sql
 select fruit,count(*) as quantity
 from fruit_inventory
 group by 1;

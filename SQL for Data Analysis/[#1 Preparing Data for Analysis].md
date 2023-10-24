@@ -192,3 +192,211 @@ percent_rank() over(partition by...order by....)
   * Example) If we have a number of transactions by the same customer and need to return one record per customer, we could find the `min`(first) and/or the `max`(most recent) **transaction_date**
  
 ## Preparing(Data Cleaning)
+
+### Cleaning Data with CASE Transformations
+
+1. Standardising the values
+```sql
+---PostgreSQL
+case when gender='F' then 'Female'
+     when gender='female' then 'Female'
+     when gender='femme' then 'Female'
+     else gender
+     end as gender_cleaned
+```
+2. Categorization(Enrichment)
+   ```sql
+   ---PostgreSQL
+   select response_id,likelihood,
+   case when likelihood<=6 then 'Detractor'
+        when likelihood<=8 then 'Passive'
+        else 'Promoter'
+        end as response_type
+   from nps_responses
+   ```
+   * When the input isn't continuous or when values in order shouldn't be grouped (using `IN` list)
+     ```sql
+     ---PostgreSQL
+     case when likelihood in (0,1,2,3,4,5,6) then 'Detractor'
+          when likelihood in (7,8) then 'Passive'
+          when likelihood in (9,10) then 'Promoter'
+          end as response_type
+     ```
+   * `CASE` statement can consider multiple columns and can contain `AND/OR` logic
+   * They can also be nested, though often this can be avoided with `AND/OR` logic
+     ```sql
+     ---PostgreSQL
+     case when likelihood <=6 and country='US' and high_value=true then 'US high value detractor'
+          when likelihood >=9 and (country in ('CA','JP') or high_value=true) then 'some other label'
+     ....end
+     ```
+3. Creating flags
+   * Indicating whether a certain value is present without returning the actual value
+     * (useful during profiling for understanding how common the existence of a particular attribute is
+   * Preparation of a data set for statistical analysis
+     * A dummy variable(taking a value of 0 or 1): Indicating the presence or absence of some qualitative variable
+   ```sql
+   ---PostgreSQL
+   select
+   customer_id,
+   case when gender='F' then 1 else 0 end as is_female,
+   case when likelihood in (9,10) then 1 else 0 end as is_promoter,
+   from...;
+   ```
+4. Flattening the Data
+   * Useful when working with a data set that has multiple rows per entity (ex: line items in an order)
+   * Wrapping in an aggregate and turn it into a flag at the same time by using **1(True)** and **0(False)** as the return value
+   ``` sql
+   ---PostgreSQL
+   select
+   customer_id,
+   max(case when fruit='apple' then 1 else 0 end) as bought_apples,
+   max(case when fruit='orange' then 1 else 0 end) as bought_oranges
+   from....
+   group by 1;
+   ```
+     * For each customer, the `CASE` statement returns 1 for any row with a fruit type of 'apple'.
+     * The `max` is evaluated and will return **the largest value** from any of the rows
+
+### Type Conversions and Casting
+* **Type conversion functions** allow pieces of data with the appropriate format to be changed from one data type to another
+1. `cast` function
+   * **cast(input as data_type) or input::data_type**
+     ```sql
+     ---PostgreSQL
+     cast(1234 as varchar)
+     1234::varchar
+     ```
+2. Dealing with **Dates** and **Datetimes**
+   * Casting the **TIMESTAMP** to a **DATE**
+     ```sql
+     ---PostgreSQL
+     select tx_timestamp::date,count(transaction) as num_transactions
+     from ....
+     group by 1;
+     ```
+   * Casting the **Date** to a **Timestamp**
+     ```sql
+     ---PostgreSQL
+     select tx_date::timestamp,count(transaction) as num_transactions
+     from ....
+     group by 1
+     ```
+3. Converting between string values and dates
+   ```sql
+   ---PostgreSQL
+   (year||','||month||'-'||day)::date
+   ---or
+   cast(concat(year,'-',month,'-',day) as date)
+   ```
+   * using `date` function
+     ```sql
+     ---PostgreSQL
+     date(concat(year,'-',month,'-',day))
+     ```
+
+### Dealing with Nulls(coalesce,nullif Functions)
+* Nulls: representing fields for which no data was collected or that are not applicable to that row
+* A variety of unexpected and frustrating results can be output from queries if we do not care about nulls
+* Ways of dealing with nulls
+  1. Allowing nulls
+  2. Rejecting nulls
+  3. Populating a default value
+ * Ways to replace with alternative values
+   1. `Case` statements: Quite complicated
+   2. `coalesce`: A more compact way, taking two or more arguments and returning the first one that is not null
+      ```sql
+      ---Postgresql
+      coalesce(num_orders,0)
+      coalesce(address,'Unknown')
+      coalesce(column_a,column_b)
+      coalesce(column_a,column_b,column_c)
+      ```
+   3 `nullif`: comparing two numbers, and if they **are not** equal, it returns the number, if they are **equal**, the function returns null
+     ```sql
+     ---PostgreSQL
+     nullif(6,7)
+     ---return 6
+     nullif(6,6)
+     ---return null
+     ```
+     * useful for turning values back into nulls when knowing a **certain default value**
+
+### Missing Data
+* It doesn't always need to be fixed or filled
+* It can reveal the underlying system design or biases in the data collection process
+
+#### Imputation techniques
+* for filling in missing data
+* including filling with an average or median of the data set, or with the previous value
+
+1. **Filling with a constant value**
+   * useful when the value is known for some records even though they were not populated in the database
+   * Using a `CASE` statement
+     ```sql
+     ---PostgreSQL
+     case when price is null and item_name='xyz' then 20 else price end as price
+     ```
+2. **Filling with a derived value**
+   * `CASE` statement
+   * `Mathematical function` on other columns
+     ```sql
+     ---PostgreSQL
+     select gross_sales-discount as net_sales...
+     ```
+     * Assuming losing a field for the `net_sales` amount for each transaction.
+     * But, having the `gross_sales` and `discount` fields populated
+     * can calculate `net_sales` by subtracting `discount` from `gross_sales`
+
+3. **Filling with values from other rows in the data set**
+   * **Fill forward**: Carrying over a value from the previous row (`lag` function)
+   * **Fill Back**: Using a value from the next row
+       ```sql
+       ---PostgreSQL
+       lag(product_price) over(partition by product order by order_date)
+       lead(product_price) over(partition by product order by order_date)
+       ```
+4. **Taking the average values of fields**
+
+## Preparing(Shaping Data)
+Manipulating the way the data is represented in columns and rows
+
+* **Important concepts in shaping data**
+  1. Figuring out the granularity of data
+     * Data have varying levels of detail
+  2. Flattering data
+     * Reducing the number of rows that represent an entity, including down to a single row
+     * Joining multiple tables together to create a single output data set
+### Pivoting with CASE statements
+* A pivot table
+  * Summarising data sets by arranging the data into rows, according to the values of an attribute, and columns, according to the values of another attribute
+  * Reshaping the data into a more compact and easily understandable form
+    ```sql
+    ---PostgreSQL
+    select order_date,
+    sum(case when product='shirt' then order_amount else 0 end) as shirts_amount,
+    sum(case when product='shoes' then order_amount else 0 end) as shoes_amount,
+    sum(case when product='hat' then order_amount else 0 end) as hats_amount
+    from orders
+    group by 1
+    ;
+    ```
+    * with the `sum` aggregation, using **else 0** is optional in case there are nulls
+    * However, when using `count` or `count distinct`, do not include `else` statment
+      * It would inflate the result set (database won't count a null, but it will count a substitute value such as zero)
+     
+### Unpivoting with UNION Statements
+* When we need to **move data stored in columns into rows instead to create tidy data**
+  ```sql
+  ---PostgreSQL
+  select country,
+  '1980 as year,
+  year_1980 as population
+  from country_populations
+  union all
+  select country,
+  '1990' as year,
+  year_1990 as population
+  from country_populations
+  ......from country_populations;
+  ```

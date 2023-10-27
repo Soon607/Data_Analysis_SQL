@@ -3,8 +3,7 @@
 * Trend: The direction in which the data is moving(moving up, increasing over time, moving down, decreasing over time)
 
 ## The Retail Sales Data Set
-<img src="이미지 URL">
-<img src="이미지 URL" width="가로 사이즈" height="세로 사이즈">
+
 
 ## Simple Trends
 * Creating a trend: A step in profiling and understanding data or final output
@@ -162,6 +161,115 @@ order by sales_year
 
 ## Percent of Total Calculations
 * To check each part's **contribution**
+* Unless the data already contains a time series of the total values, need to calculate **the overall total** in order to calculate the per cent of the total for each row
+* using `self-JOIN` or a `window` function
+  * `self-JOIN`
+    * Anytime a table is joined to **itself**
+    * As long as each instance of the table in the query is given a different alias, the database will treat them all as **distinct tables**
+    ```sql
+    ---PostgreSql
+    select
+	sales_month,
+	kind_of_business,
+	sales*100/total_sales as pct_total_sales
+	from
+	(select
+	a.sales_month,
+	a.kind_of_business,
+	a.sales,
+	sum(b.sales) as total_sales
+	from retail_sales a
+	join retail_sales b on a.sales_month=b.sales_month
+	and b.kind_of_business in ('Mens''s clothing stores','Women''s clothing stores')
+	where 
+	a.kind_of_business in ('Men''s clothing stores','Women''s clothing stores')
+	group by 1,2,3
+	order by a.sales_month) aa
+	order by sales_month;
+    ```
+  * using `sum` window function and `PARTITION BY`
+  * `PARTITION BY`: indicating the **section** of the table within which the function should calculate
+	  ```sql
+	  ---PostgreSql
+	  select
+		sales_month,
+		kind_of_business,
+		sales,
+		sum(sales) over (partition by sales_month) as total_sales,
+		sales*100/sum(sales) over (partition by sales_month) as pct_total
+		from retail_sales
+		where kind_of_business in ('Men''s clothing stores','Women''s clothing stores')
+		order by sales_month;
+	  ```
 
-       
-               
+* Finding the percent of sales within **a longer time period**
+  * `self-JOIN`
+    ```sql
+    ---PostgreSql
+    select
+	sales_month,
+	kind_of_business,
+	sales*100/yearly_salse as pct_yearly
+	from
+	(select
+	a.sales_month,
+	a.kind_of_business,
+	a.sales,
+	sum(b.sales) as yearly_salse
+	from retail_sales a
+	join retail_sales b on
+	date_part('year',a.sales_month)=date_part('year',b.sales_month)
+	and a.kind_of_business=b.kind_of_business
+	and b.kind_of_business in ('Men''s clothing stores','Women''s clothing stores')
+	where a.kind_of_business in ('Men''s clothing stores','Women''s clothing stores')
+	group by 1,2,3
+	order by 
+	a.sales_month) aa;
+    ```
+  * `window function`
+    ```sql
+    ---PostgreSql
+    select
+	sales_month,
+	kind_of_business,
+	sales,
+	sum(sales) over (partition by date_part('year',sales_month),kind_of_business) as yearly_sales,
+	sales*100/sum(sales) over (partition by date_part('year',sales_month),kind_of_business) as pct_yearly
+	from retail_sales
+	where kind_of_business in ('Men''s clothing stores','Women''s clothing stores')
+	order by sales_month;
+    ```
+## Indexing to See Percent Change over Time
+* Understanding the changes in a time series relative to a **base period(starting point)**
+* **Consumer Price Index(CPI)**
+  * Tracking the change in the prices of items
+  * Tracking inflation
+  * Deciding on increasing the salary
+  * and for many other applications
+* Using `first_value` window function
+  * Returning the sales value for the first row in the entire data set
+    ```sql
+    ---PostgreSql
+    select sales_year,sales,
+	first_value(sales) over (order by sales_year) as index_sales
+	from
+	(select date_part('year',sales_month) as sales_year,
+	sum(sales) as sales
+	from retail_sales
+	where kind_of_business='Women''s clothing stores'
+	group by 1)a;
+    ```
+  * Finding the **percent change**
+    ```sql
+    ---PostgreSql
+    select
+	sales_year,
+	sales,
+	(sales/first_value(sales) over (order by sales_year)-1)*100 as pct_from_index
+	from
+	(select date_part('year',sales_month) as sales_year,
+	sum(sales) as sales
+	from retail_sales
+	where kind_of_business='Women''s clothing stores'
+	group by 1)a;
+    ```

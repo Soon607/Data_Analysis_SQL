@@ -3,8 +3,7 @@
 * Trend: The direction in which the data is moving(moving up, increasing over time, moving down, decreasing over time)
 
 ## The Retail Sales Data Set
-
-
+![The Retail Sales Data Set](https://github.com/Soon607/Data-Analysis-SQL-/assets/98214539/9a61ff03-145e-4ef0-8912-c268ffefd524)
 ## Simple Trends
 * Creating a trend: A step in profiling and understanding data or final output
 * The result set is a series of dates or timestamps and a numerical value.

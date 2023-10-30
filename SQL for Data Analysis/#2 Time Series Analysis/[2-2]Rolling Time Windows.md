@@ -136,3 +136,56 @@
       and b.kind_of_business='Women''s clothing stores'
       group by 1
     ```
+## Calculating Cumulative Values
+* Year-To-Date(YTD), Quarter-To-Date(QTD), Month-To-Date(MTD)
+* Rather than a fixed-length window, relying on a common starting point, with the window size growing with each row
+* Using a `window function`
+  * Finding **total sales YTD as of each month**
+  * using `sum`
+    ```sql
+    ---Postgresql
+    select 
+      sales_month,
+      sales,
+      sum(sales) over (partition by date_part('year',sales_month) order by sales_month) as sales_ytd
+      from retail_sales
+      where kind_of_business='Women''s clothing stores'
+      ;
+  * Finding a **monthly average YTD**
+  * using `avg`
+    ```sql
+    ---Postgresql
+    select 
+      sales_month,
+      sales,
+      avg(sales) over (partition by date_part('year',sales_month) order by sales_month) as sales_ytd
+      from retail_sales
+      where kind_of_business='Women''s clothing stores'
+      ;
+  * Finding a **monthly maximum YTD**
+  * use `max`
+    ```sql
+    ---Postgresql
+    select 
+      sales_month,
+      sales,
+      max(sales) over (partition by date_part('year',sales_month) order by sales_month) as sales_ytd
+      from retail_sales
+      where kind_of_business='Women''s clothing stores'
+      ;
+    ```
+* Using `self-JOIN`
+  ```sql
+  ---Postgresql
+  select
+    a.sales_month,
+    a.sales,
+    sum(b.sales) as sales_ytd
+    from retail_sales a
+    join retail_sales b
+    on date_part('year',a.sales_month)=date_part('year',b.sales_month)
+    and b.sales_month<=a.sales_month
+    and b.kind_of_business='Women''s clothing stores'
+    where a.kind_of_business='Women''s clothing stores'
+    group by 1,2;
+  ```

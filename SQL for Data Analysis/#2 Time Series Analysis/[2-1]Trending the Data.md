@@ -42,7 +42,7 @@ kind_of_business,
 sum(sales) as sales
 from retail_sales
 where kind_of_business in ('Book stores','Sporting goods stores', 'Hobby, toy, and games stores')
-group by 1,2,3
+group by 1,2
 order by sales_year
 ```
 2. Looking at sales at **women's clothing stores** and **men's clothing stores**

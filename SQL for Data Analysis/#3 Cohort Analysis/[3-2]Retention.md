@@ -210,10 +210,10 @@
     * can then be plugged into the retention code
     * However, when there is no subsequent term, the `lead` function returns *null*
     * And, it assumes that terms are always consecutive, with no time spent out of office
-   
-  ## Summary
-  * When we make adjustments to fill in missing data, we need to be careful about the assumptions we would make.
-  * In subscription or term-based contexts, explicit start and end dates tend to be most accurate.
-  * Adding fixed interval or setting the end date relative to the next start date can be used when no end date is present and we have a reasonable expectation that most customers or users will stay for the duration assumed
+
+## Summary
+* When we make adjustments to fill in missing data, we need to be careful about the assumptions we would make.
+* In subscription or term-based contexts, explicit start and end dates tend to be most accurate.
+* Adding a fixed interval or setting the end date relative to the next start date can be used when no end date is present and we have a reasonable expectation that most customers or users will stay for the duration assumed
 
   

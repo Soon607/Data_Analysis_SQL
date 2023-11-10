@@ -211,9 +211,125 @@
     * However, when there is no subsequent term, the `lead` function returns *null*
     * And, it assumes that terms are always consecutive, with no time spent out of office
 
-## Summary
+### Summary
 * When we make adjustments to fill in missing data, we need to be careful about the assumptions we would make.
 * In subscription or term-based contexts, explicit start and end dates tend to be most accurate.
-* Adding a fixed interval or setting the end date relative to the next start date can be used when no end date is present and we have a reasonable expectation that most customers or users will stay for the duration assumed
+* Adding a fixed interval or setting the end date relative to the next start date can be used when no end date is present, and we have a reasonable expectation that most customers or users will stay for the duration assumed
 
-  
+## Cohorts Derived from the Time Series Itself
+* After calculating retention, we can start to split the entities into cohorts
+
+### Time-based cohorts
+* Creating the cohorts based on the first or minimum date or time that the entity appears in the time series (Time-based cohorts)
+  * Only one table is necessary for the cohort retention analysis(The times series itself)
+  * The way is interesting because groups often start at different times and behave differently
+  * can be grouped by any time granularity that is meaningful to the organisation(weekly, monthly, or yearly)
+* First Example: Does the era where a legislator first took office have any correlation with their retention? (Political trends and the public mood do change over time?)
+  * Using *yearly cohorts* and demonstrating swapping in centuries
+  * First, adding the year of the *first term* calculated previously
+    ```sql
+    ---Postgresql
+    select
+      date_part('year',a.first_term) as first_year,
+      coalesce(date_part('year',age(c.date,a.first_term)),0) as period,
+      count(distinct a.id_bioguide) as cohort_retained
+      from
+      (select id_bioguide, min(term_start) as first_term
+      from legislators_terms
+      group by 1) a
+      join legislators_terms b on a.id_bioguide=b.id_bioguide
+      left join date_dim c
+      on c.date between b.term_start and b.term_end
+      and c.month_name='December' and c.day_of_month=31
+      group by 1,2
+    ```
+  * The above query is used as the *subquery* and calculating the *cohort_size* and *pct_retained*
+    ```sql
+    ---Postgresql
+    select
+      first_year,period,
+      first_value(cohort_retained) over (partition by first_year order by period) as cohort_size,
+      cohort_retained,
+      1.0*cohort_retained/first_value(cohort_retained) over (partition by first_year order by period) as pct_retained
+      from
+      (select
+      date_part('year',a.first_term) as first_year,
+      coalesce(date_part('year',age(c.date,a.first_term)),0) as period,
+      count(distinct a.id_bioguide) as cohort_retained
+      from
+      (select id_bioguide, min(term_start) as first_term
+      from legislators_terms
+      group by 1) a
+      join legislators_terms b on a.id_bioguide=b.id_bioguide
+      left join date_dim c
+      on c.date between b.term_start and b.term_end
+      and c.month_name='December' and c.day_of_month=31
+      group by 1,2)aa
+    ```
+  * Looking at a less granular interval and cohort the legislators by the century of the *first_term*
+    ```sql
+    ---Postgresql
+    select
+      first_year,period,
+      first_value(cohort_retained) over (partition by first_year order by period) as cohort_size,
+      cohort_retained,
+      1.0*cohort_retained/first_value(cohort_retained) over (partition by first_year order by period) as pct_retained
+      from
+      (select
+      date_part('century',a.first_term) as first_year,
+      coalesce(date_part('year',age(c.date,a.first_term)),0) as period,
+      count(distinct a.id_bioguide) as cohort_retained
+      from
+      (select id_bioguide, min(term_start) as first_term
+      from legislators_terms
+      group by 1) a
+      join legislators_terms b on a.id_bioguide=b.id_bioguide
+      left join date_dim c
+      on c.date between b.term_start and b.term_end
+      and c.month_name='December' and c.day_of_month=31
+      group by 1,2)aa
+    ```
+    * Substituting `century` for `year` in the `date_part` function in *subquery aa*
+* Cohorts can be defined from other attributes in a time series besides the first date, with options depending on the values in the table
+* Using *state* field as cohorts
+  * Finding the first state for each legislators
+    ```sql
+    ---Postgresql
+    select
+     distinct id_bioguide,
+     min(term_start) over (partition by id_bioguide) as first_term,
+     first_value(state) over (partition by id_bioguide order by term_start) as first_state
+     from legislators_terms;
+    ```
+  * Plugging this code into the retention code
+    ```sql
+    ---Postgresql
+    select
+     first_state,period,
+     first_value(cohort_retained) over (partition by first_state order by period) as cohort_size
+     ,cohort_retained,
+     1.0*cohort_retained/
+     first_value(cohort_retained) over (partition by first_state order by period) as pct_retained 
+     from
+     (select
+     a.first_state as first_state,
+     coalesce(date_part('year',age(c.date,a.first_term)),0) as period,
+     count(distinct a.id_bioguide) as cohort_retained
+     from
+     (select
+     distinct id_bioguide,
+     min(term_start) over (partition by id_bioguide) as first_term,
+     first_value(state) over (partition by id_bioguide order by term_start) as first_state
+     from legislators_terms)a
+     join legislators_terms b
+     on a.id_bioguide=b.id_bioguide
+     left join date_dim c
+     on c.date between b.term_start and b.term_end and
+     c.month_name='December' and c.day_of_month=31
+     group by 1,2)
+     aa
+    ```
+### Summary
+* Defining cohorts from the time series is relatively straightforward, using a `min` date for each entity and then converting that date into a month, year, or century as appropriate for the analysis.
+* Switching between month and year or other levels of granularity is also straightforward.
+* Allowing for multiple options to be tested in order to find a grouping that is meaningful for the organisations.

@@ -530,3 +530,69 @@
           and aaa.period=ddd.period;
     ```
 ## Defining Cohorts from Dates Other Than the First Date
+* Cohorting on a different date can be useful and insightful
+  * When wanting to look at retention across all customers using service as of a particular date
+  * It can help understand whether product or marketing changes have had a long-term impact on existing customers.
+* Need to take care to define criteria for inclusion in each cohort precisely.
+  * First option
+    * Picking entities present on a particular calendar date.
+    * It is straightforward to put into SQL code.
+    * However, it can be problematic if a large share of the regular user population does not show up every day, causing retention to vary depending on the exact day chosen.
+      * Calculating retention for several starting dates and then averaging the result can correct this problem.
+  * Second option
+    * Using a window of time such as a week or month
+### Calculating midstream analysis
+* Cohorting by the *term_type* ('sen', 'rep')
+* Including any legislator in office at any time during the year 2000(who started prior to 2000 and whose terms ended during or after 2000 qualify)
+  ```sql
+      select
+    distinct id_bioguide,
+    term_type,
+    date('2000-01-01') as first_term,
+    min(term_start) as min_start
+    from legislators_terms
+    where term_start <='2000-12-31' and term_end>='2000-01-01'
+    group by 1,2,3
+    ;
+  ```
+* Plugging the above code into the retention code, with two adjustments
+  * First
+    * An additional `JOIN` criteria between *subquery a* and the *legislators_terms* table is added in order to return only terms that started on or after the *min_start* date
+  * Second
+    * An additional filter is added to the *date_dim* so that it only returns dates in 2000 or later
+  ```sql
+  ---Postgresql
+  select
+     term_type,period,
+     first_value(cohort_retained) over (partition by term_type order by period) as cohort_sized,
+     cohort_retained,
+     1.0*cohort_retained/first_value(cohort_retained) over (partition by term_type order by period) as pct_retained
+     from
+     (select
+     a.term_type,
+     coalesce(date_part('year',age(c.date,a.first_term)),0) as period,
+     count(distinct a.id_bioguide) as cohort_retained
+     from
+     (select
+     distinct id_bioguide,
+     term_type,
+     date('2000-01-01') as first_term,
+     min(term_start) as min_start
+     from legislators_terms
+     where term_start <='2000-12-31' and term_end>='2000-01-01'
+     group by 1,2,3) a
+     join legislators_terms b 
+     on a.id_bioguide=b.id_bioguide
+     and b.term_start>=a.min_start
+     left join date_dim c
+     on c.date between b.term_start and b.term_end
+     and c.month_name='December' and c.day_of_month=31
+     and c.year>=2000
+     group by 1,2)aa
+     ;
+  ```
+### Summary
+* A common use case for cohorts on a value other than a starting value is when trying to analyse retention after an entity has reached a threshold, such as a certain number of purchases or a certain amount spent
+* It is important to take care in defining what qualifies an entity to be in a cohort and which date will be used as the starting date.
+## Conclusion
+* Cohort retention is a powerful way to understand the behaviour of entities in a time series data set

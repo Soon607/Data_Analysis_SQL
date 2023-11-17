@@ -70,21 +70,27 @@
     ```sql
     ---Postgresql
     select
-      b.date,
-      date_part('century',c.first_term) as century,
-      count(distinct a.id_bioguide) as legislators
-      from legislators_terms a
-      join date_dim b
-      on b.date between a.term_start and a.term_end
-      and b.month_name='December' and b.day_of_month=31
-      and b.year<=2019
-      join
-      (
-      select id_bioguide,min(term_start) as first_term
-      from legislators_terms
-      group by 1)c
-      on a.id_bioguide=c.id_bioguide
-      group by 1,2
+       date,
+       century,
+       legislators,
+       sum(legislators) over (partition by date) as cohort,
+       1.0*legislators/sum(legislators) over (partition by date) as pct_century
+       from
+       (select
+       b.date,
+       date_part('century',c.first_term) as century,
+       count(distinct a.id_bioguide) as legislators
+       from legislators_terms a
+       join date_dim b
+       on b.date between a.term_start and a.term_end
+       and b.month_name='December' and b.day_of_month=31
+       and b.year<=2019
+       join
+       (select id_bioguide,min(term_start) as first_term
+       from legislators_terms
+       group by 1)c
+       on a.id_bioguide=c.id_bioguide
+       group by 1,2)aa
     ```
   * Second: Resulting in one row per year, with a column for each century.
   * It may be easier to scan for trends.

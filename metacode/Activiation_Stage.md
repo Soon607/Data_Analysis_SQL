@@ -26,7 +26,7 @@ order by a.event_time,a.category_id
 ;
 ```
 ## Conversion Rate base on event_date
-``sql
+```sql
 select
 a.event_time,
 100*(1.0*a.active_user/b.total_user) as conversion_rate

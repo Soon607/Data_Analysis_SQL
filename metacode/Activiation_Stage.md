@@ -107,3 +107,54 @@ order by 1,2)b
 on a.year=b.year and a.month=b.month
 order by a.year,a.month)as c;
 ```
+## Number of DailySessions per User
+```sql
+select
+a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as sessions_per_user
+from
+(select
+event_time,count(distinct user_id) as user
+from data
+group by event_time
+order by event_time)a
+join
+(select
+event_time,count(user_session) as user_session
+from data
+group by event_time
+order by event_time)b
+on a.event_time=b.event_time
+order by a.event_time
+```
+### Number of DailySessions per User(without remove_from_cart)
+```sql
+select
+a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as sessions_per_user
+from
+(select
+event_time,count(distinct user_id) as user
+from data
+where not event_type='remove_from_cart'
+group by event_time
+order by event_time)a
+join
+(select
+event_time,count(user_session) as user_session
+from data
+where not event_type='remove_from_cart'
+group by event_time
+order by event_time)b
+on a.event_time=b.event_time
+order by a.event_time
+```
+
+## Final Table(Oct-Dec)
+```sql
+select a.event_time,a.total_user,a.active_user,concat(a.conversion_rate,'%') as conversion_rate,b.number_of_user_session,
+concat('$',round(c.revenue,0)) as revenue from
+daily_conversion_rate a
+join daily_usersession b
+on a.event_time=b.event_time
+join daily_revenue c
+on b.event_time=c.event_time
+```

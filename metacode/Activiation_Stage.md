@@ -26,17 +26,15 @@ order by a.event_time,a.category_id
 ;
 ```
 ----
-### Conver rate with number of session
+### Daily Conversion Rate
 ```sql
-select
-a.event_time,
-round(100*(1.0*a.active_user/b.total_user),1) as conversion_rate,
-b.total_user,
-a.active_user
+with data1 as(select
+a.event_time,b.total_user,a.active_user,
+round(100*(1.0*a.active_user/b.total_user),1) as conversion_rate
 from
 (select
 event_time,
-count(*) as active_user
+count(distinct user_id) as active_user
 from data
 where event_type='purchase'
 group by 1
@@ -44,12 +42,19 @@ order by 1)a
 join
 (select
 event_time,
-count(*) as total_user
+count(distinct user_id) as total_user
 from data
 group by 1
 order by 1)
 b
-on a.event_time=b.event_time;
+on a.event_time=b.event_time)
+
+select
+a.event_time,a.total_user,a.active_user,concat(a.conversion_rate,'%') as conversion_rate,b.revenue
+from data1 a
+join daily_revenue b
+on a.event_time=b.event_time
+order by a.event_time;
 ```
 ## Conversion Rate based on event_date
 ```sql
@@ -146,15 +151,4 @@ group by event_time
 order by event_time)b
 on a.event_time=b.event_time
 order by a.event_time
-```
-
-## Final Table(Oct-Dec)
-```sql
-select a.event_time,a.total_user,a.active_user,concat(a.conversion_rate,'%') as conversion_rate,b.number_of_user_session,
-concat('$',round(c.revenue,0)) as revenue from
-daily_conversion_rate a
-join daily_usersession b
-on a.event_time=b.event_time
-join daily_revenue c
-on b.event_time=c.event_time
 ```

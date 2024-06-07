@@ -56,6 +56,42 @@ join daily_revenue b
 on a.event_time=b.event_time
 order by a.event_time;
 ```
+*****
+```sql
+with data1 as(select
+a.event_time,b.total_user,a.active_user,
+round(100*(1.0*a.active_user/b.total_user),1) as conversion_rate
+from
+(select
+event_time,
+count(distinct user_id) as active_user
+from data_101112
+where event_type='purchase'
+group by 1
+order by 1)a
+join
+(select
+event_time,
+count(distinct user_id) as total_user
+from data_101112
+group by 1
+order by 1)
+b
+on a.event_time=b.event_time)
+,
+data2 as(select event_time,sum(price) as revenue
+from data_101112
+where event_type='purchase'
+group by event_time
+order by event_time)
+
+select
+a.event_time,a.total_user,a.active_user,concat(a.conversion_rate,'%') as conversion_rate,b.revenue
+from data1 a
+join data2 b
+on a.event_time=b.event_time
+order by a.event_time;
+```
 ## Conversion Rate based on event_date
 ```sql
 select

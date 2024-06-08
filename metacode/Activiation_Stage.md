@@ -188,3 +188,17 @@ order by event_time)b
 on a.event_time=b.event_time
 order by a.event_time
 ```
+### Updating Table
+```sql
+drop table if exists data_0113;
+
+create table data_0113(
+id varchar(20),
+event_time date,
+event_type varchar(20),
+product_id varchar(20),
+category_id varchar(20),
+price numeric,
+user_id varchar(20),
+user_session varchar(50));
+```

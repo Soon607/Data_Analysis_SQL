@@ -190,15 +190,15 @@ order by a.event_time
 ```
 ### Updating Table
 ```sql
-drop table if exists data_0113;
+drop table if exists new_data;
 
-create table data_0113(
+create table new_data(
 id varchar(20),
 event_time date,
 event_type varchar(20),
-product_id varchar(20),
-category_id varchar(20),
+category_id varchar(50),
+brand varchar(20),
 price numeric,
 user_id varchar(20),
-user_session varchar(50));
+user_session varchar(50))
 ```

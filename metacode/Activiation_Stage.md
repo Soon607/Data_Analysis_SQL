@@ -162,7 +162,8 @@ join data2 b
 on a.event_time=b.event_time and a.brand=b.brand
 order by a.event_time,a.brand
 ```
-# Updating Table
+# Other Querys
+## Updating Table
 ```sql
 drop table if exists new_data;
 
@@ -175,4 +176,30 @@ brand varchar(20),
 price numeric,
 user_id varchar(20),
 user_session varchar(50))
+```
+## Brand Ranking
+```sql
+with data as(select extract(month from event_time) as month,brand,round(sum(price),0) as revenue
+from new_data
+where event_type='purchase'
+group by extract(month from event_time),brand
+order by extract(month from event_time),revenue desc),
+rank_data as
+(SELECT month, brand, revenue, rank
+FROM (
+    SELECT month, brand, revenue,
+           ROW_NUMBER() OVER (PARTITION BY month ORDER BY revenue DESC) AS rank
+    FROM data
+    WHERE month IN (10, 11, 12) AND brand IS NOT NULL
+) AS ranked_data
+ORDER BY month, rank)
+
+
+SELECT month, 
+       MAX(brand) AS brand,
+       SUM(revenue) AS revenue
+FROM rank_data
+WHERE rank > 9
+GROUP BY month
+order by month
 ```

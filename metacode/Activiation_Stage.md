@@ -1,31 +1,47 @@
-## Conversion Rate based on event_date, category_id
+# Acquisition&Activiation Level
+## User-Sessions per User
+### Number of DailySessions per User
 ```sql
 select
-a.event_time,a.category_id,
-round((1.0*a.active_user/b.total_user)*100,1) as conversion_rate
+a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as sessions_per_user
 from
 (select
-event_time,
-category_id,
-count(*) as active_user
+event_time,count(distinct user_id) as user
 from data
-where event_type='purchase'
-group by 1,2
-order by 1,2)a
+group by event_time
+order by event_time)a
 join
 (select
-event_time,
-category_id,
-count(*) as total_user
+event_time,count(user_session) as user_session
 from data
-group by 1,2
-order by 1,2)
-b
-on a.event_time=b.event_time and a.category_id=b.category_id
-order by a.event_time,a.category_id
-;
+group by event_time
+order by event_time)b
+on a.event_time=b.event_time
+order by a.event_time
 ```
-----
+### Number of DailySessions per User(without remove_from_cart)
+```sql
+select
+a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as sessions_per_user
+from
+(select
+event_time,count(distinct user_id) as user
+from data
+where not event_type='remove_from_cart'
+group by event_time
+order by event_time)a
+join
+(select
+event_time,count(user_session) as user_session
+from data
+where not event_type='remove_from_cart'
+group by event_time
+order by event_time)b
+on a.event_time=b.event_time
+order by a.event_time
+```
+****
+## Conversion Rate
 ### Daily Conversion Rate
 ```sql
 with data1 as(select
@@ -92,30 +108,7 @@ join data2 b
 on a.event_time=b.event_time
 order by a.event_time;
 ```
-## Conversion Rate based on event_date
-```sql
-select
-a.event_time,
-100*(1.0*a.active_user/b.total_user) as conversion_rate
-from
-(select
-event_time,
-count(*) as active_user
-from data
-where event_type='purchase'
-group by 1
-order by 1)a
-join
-(select
-event_time,
-count(*) as total_user
-from data
-group by 1
-order by 1)
-b
-on a.event_time=b.event_time;
-```
-## Monthly_Conversion_Rate
+### Monthly_Conversion_Rate
 ```sql
 with 
 monthly_purchase as(
@@ -148,47 +141,28 @@ order by 1,2)b
 on a.year=b.year and a.month=b.month
 order by a.year,a.month)as c;
 ```
-## Number of DailySessions per User
+### Daily Conversion Rate(Brand)
 ```sql
+with data1 as
+(select event_time,brand,count(brand) as quantity 
+from new_data
+group by event_time,brand
+order by event_time),
+data2 as(
+select event_time,brand,count(brand) as sold,sum(price) as revenue
+from new_data
+where event_type='purchase'
+group by event_time,brand
+order by event_time)
+
 select
-a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as sessions_per_user
-from
-(select
-event_time,count(distinct user_id) as user
-from data
-group by event_time
-order by event_time)a
-join
-(select
-event_time,count(user_session) as user_session
-from data
-group by event_time
-order by event_time)b
-on a.event_time=b.event_time
-order by a.event_time
+a.event_time, a.brand,a.quantity,b.sold,concat(round(1.0*b.sold/a.quantity,2),'%') as conversion_rate,b.revenue
+from data1 a
+join data2 b
+on a.event_time=b.event_time and a.brand=b.brand
+order by a.event_time,a.brand
 ```
-### Number of DailySessions per User(without remove_from_cart)
-```sql
-select
-a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as sessions_per_user
-from
-(select
-event_time,count(distinct user_id) as user
-from data
-where not event_type='remove_from_cart'
-group by event_time
-order by event_time)a
-join
-(select
-event_time,count(user_session) as user_session
-from data
-where not event_type='remove_from_cart'
-group by event_time
-order by event_time)b
-on a.event_time=b.event_time
-order by a.event_time
-```
-### Updating Table
+# Updating Table
 ```sql
 drop table if exists new_data;
 

@@ -203,3 +203,17 @@ WHERE rank > 9
 GROUP BY month
 order by month
 ```
+## Brand Ranking(2)
+```sql
+with data1 as(select
+brand,revenue,row_number() over (order by revenue desc) as rank
+from
+(select brand,round(sum(price),0) as revenue
+from new_data
+where event_type='purchase' and brand is not null and event_time between '2019-10-1' and '2019-12-31'
+group by 1
+order by revenue desc)a)
+
+select * from data1
+where rank<10
+```

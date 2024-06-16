@@ -146,14 +146,14 @@ order by a.year,a.month)as c;
 with data1 as
 (select event_time,brand,count(*) as quantity 
 from new_data
-where brand in (select brand from brand_ranking where not brand='other brands')
+where brand in (select brand from brand_top10)
 group by event_time,brand
 order by event_time),
 data2 as(
 select event_time,brand,count(*) as sold,sum(price) as revenue
 from new_data
 where event_type='purchase'
-and brand in (select brand from brand_ranking where not brand='other brands')
+and brand in (select brand from brand_top10)
 group by event_time,brand
 order by event_time)
 
@@ -162,7 +162,9 @@ a.event_time, a.brand,a.quantity,b.sold,concat(round(1.0*b.sold/a.quantity,2),'%
 from data1 a
 join data2 b
 on a.event_time=b.event_time and a.brand=b.brand
-order by a.event_time,a.brand
+join brand_top10c
+on b.brand=c.brand
+order by a.event_time,c.rank
 ```
 ### Daily Conversion Rate(Other Brands)
 ```sql

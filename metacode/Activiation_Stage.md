@@ -141,26 +141,56 @@ order by 1,2)b
 on a.year=b.year and a.month=b.month
 order by a.year,a.month)as c;
 ```
-### Daily Conversion Rate(Brand)
+### Daily Conversion Rate(Brand 1-9)
 ```sql
 with data1 as
-(select event_time,brand,count(brand) as quantity 
+(select event_time,brand,count(*) as quantity 
 from new_data
+where brand in (select brand from brand_ranking where not brand='other brands')
 group by event_time,brand
 order by event_time),
 data2 as(
-select event_time,brand,count(brand) as sold,sum(price) as revenue
+select event_time,brand,count(*) as sold,sum(price) as revenue
 from new_data
 where event_type='purchase'
+and brand in (select brand from brand_ranking where not brand='other brands')
 group by event_time,brand
 order by event_time)
 
 select
-a.event_time, a.brand,a.quantity,b.sold,concat(round(1.0*b.sold/a.quantity,2),'%') as conversion_rate,b.revenue
+a.event_time, a.brand,a.quantity,b.sold,concat(round(1.0*b.sold/a.quantity,2),'%') as conversion_rate,round(b.revenue,0) as revenue
 from data1 a
 join data2 b
 on a.event_time=b.event_time and a.brand=b.brand
 order by a.event_time,a.brand
+```
+### Daily Conversion Rate(Other Brands)
+```sql
+with data1 as
+(select event_time,brand,count(*) as quantity 
+from new_data
+where brand not in (select brand from brand_ranking where not brand='other brands')
+group by event_time,brand
+order by event_time),
+data2 as(
+select event_time,brand,count(*) as sold,sum(price) as revenue
+from new_data
+where event_type='purchase'
+and brand not in (select brand from brand_ranking where not brand='other brands')
+group by event_time,brand
+order by event_time)
+
+select
+event_time,sum(quantity) as quantity, sum(sold) as sold,concat(sum(round(1.0*sold/quantity,2)),'%') as conversion_rate,sum(revenue) as revenue
+from
+(select
+a.event_time, a.brand,a.quantity,b.sold,concat(round(1.0*b.sold/a.quantity,2),'%') as conversion_rate,round(b.revenue,0) as revenue
+from data1 a
+join data2 b
+on a.event_time=b.event_time and a.brand=b.brand
+order by a.event_time,a.brand)a
+group by event_time
+order by event_time
 ```
 # Other Querys
 ## Updating Table

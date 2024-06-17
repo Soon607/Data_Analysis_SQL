@@ -261,3 +261,17 @@ order by revenue desc)a)
 select * from data1
 where rank<10
 ```
+## Adding Day Name Column
+``sql
+SELECT 
+    event_time, 
+    event_type, 
+    category_id, 
+    brand, 
+    price, 
+    user_id, 
+    user_session,
+    TO_CHAR(event_time, 'FMDay') AS day_name
+FROM 
+    new_data;
+```

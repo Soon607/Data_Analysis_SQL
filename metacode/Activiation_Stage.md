@@ -262,7 +262,7 @@ select * from data1
 where rank<10
 ```
 ## Adding Day Name Column
-``sql
+```sql
 SELECT 
     event_time, 
     event_type, 

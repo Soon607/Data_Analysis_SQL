@@ -275,3 +275,18 @@ SELECT
 FROM 
     new_data;
 ```
+## Updating Table
+```sql
+select * from new_data
+union all
+select * from data_01_06
+union all 
+select * from data_07_12
+union all
+select * from data_13_17
+union all
+select * from data_18_19
+union all
+select * from data_20_22
+order by event_time
+```

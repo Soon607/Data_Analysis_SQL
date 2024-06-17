@@ -2,20 +2,32 @@
 ## User-Sessions per User
 ### Number of DailySessions per User
 ```sql
-select
+with data1 as(select
 a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as sessions_per_user
 from
 (select
 event_time,count(distinct user_id) as user
-from data
+from data_20_22
 group by event_time
 order by event_time)a
 join
 (select
 event_time,count(user_session) as user_session
-from data
+from data_20_22
 group by event_time
 order by event_time)b
+on a.event_time=b.event_time
+order by a.event_time),
+data2 as(
+select event_time,round(sum(price),0) as revenue
+from data_20_22
+group by event_time
+order by event_time)
+
+select
+a.event_time,a.user,a.user_session,a.sessions_per_user,b.revenue
+from data1 a
+join data2 b
 on a.event_time=b.event_time
 order by a.event_time
 ```

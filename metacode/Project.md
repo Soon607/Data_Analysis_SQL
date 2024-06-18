@@ -243,7 +243,7 @@ group by f.first_event,j.activity_week)
 
 select
 a.first_event,a.activity_week,a.retained_users,
-1.0*a.retained_users/first_value(a.retained_users) over (partition by a.first_event order by activity_week) as retention_ratio,
+round(1.0*a.retained_users/first_value(a.retained_users) over (partition by a.first_event order by activity_week),2) as retention_ratio,
 a.cumulative_retained_users
 from
 (select
@@ -253,6 +253,29 @@ retained_users,
 sum(retained_users) over (partition by first_event order by activity_week) as cumulative_retained_users
 from weekly_retention
 order by first_event,activity_week)a
+```
+# Revenue
+## APRU&ARPPU
+```sql
+select
+a.event_time,b.total_user,a.active_user,a.revenue,a.arppu,round(a.revenue/b.total_user,1)as APRU
+from
+(select
+event_time,
+count(distinct user_id) as active_user,
+round(sum(price),0) as revenue,
+round(sum(price)/count(distinct user_id),1) as ARPPU
+from data
+where event_type='purchase'
+group by event_time) a
+join 
+(
+select 
+event_time,
+count(distinct user_id) as total_user
+from data
+group by event_time)b
+on a.event_time=b.event_time
 ```
 # Other Querys
 ## Updating Table

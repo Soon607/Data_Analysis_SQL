@@ -206,6 +206,54 @@ order by a.event_time,a.brand)a
 group by event_time
 order by event_time
 ```
+# Retention
+## Retention(User-Session)
+```sql
+with data as(select * from new_data
+union all
+select * from data_01_06
+union all 
+select * from data_07_12
+union all
+select * from data_13_17
+union all
+select * from data_18_19
+union all
+select * from data_20_22
+order by event_time),
+user_activity AS (
+SELECT
+user_id,
+DATE_TRUNC('week', event_time) AS activity_week
+FROM
+data),
+first_event as(
+select
+user_id,min(activity_week) as first_event
+from user_activity
+group by user_id),
+weekly_retention as(
+select
+f.first_event,j.activity_week,count(distinct j.user_id) as retained_users
+from first_event f
+join user_activity j
+on f.user_id=j.user_id
+where j.activity_week>=f.first_event
+group by f.first_event,j.activity_week)
+
+select
+a.first_event,a.activity_week,a.retained_users,
+1.0*a.retained_users/first_value(a.retained_users) over (partition by a.first_event order by activity_week) as retention_ratio,
+a.cumulative_retained_users
+from
+(select
+first_event,
+activity_week,
+retained_users,
+sum(retained_users) over (partition by first_event order by activity_week) as cumulative_retained_users
+from weekly_retention
+order by first_event,activity_week)a
+```
 # Other Querys
 ## Updating Table
 ```sql

@@ -7,20 +7,21 @@ a.event_time,a.user,b.user_session,round(1.0*b.user_session/a.user,1) as session
 from
 (select
 event_time,count(distinct user_id) as user
-from data_20_22
+from data_23_24
 group by event_time
 order by event_time)a
 join
 (select
 event_time,count(user_session) as user_session
-from data_20_22
+from data_23_24
 group by event_time
 order by event_time)b
 on a.event_time=b.event_time
 order by a.event_time),
 data2 as(
 select event_time,round(sum(price),0) as revenue
-from data_20_22
+from data_23_24
+where event_type='purchase'
 group by event_time
 order by event_time)
 

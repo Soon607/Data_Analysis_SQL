@@ -362,3 +362,69 @@ union all
 select * from data_20_22
 order by event_time
 ```
+## Summary per Days
+```sql
+---Conversion Rate
+with data as(select * from new_data
+union all
+select * from data_01_06
+union all 
+select * from data_07_12
+union all
+select * from data_13_17
+union all
+select * from data_18_19
+union all
+select * from data_20_22
+union all
+select * from data_23_24
+order by event_time),
+
+data1 as(select
+a.event_time,b.total_user,a.active_user,
+round(100*(1.0*a.active_user/b.total_user),1) as conversion_rate
+from
+(select
+event_time,
+count(distinct user_id) as active_user
+from data
+where event_type='purchase'
+group by 1
+order by 1)a
+join
+(select
+event_time,
+count(distinct user_id) as total_user
+from data
+group by 1
+order by 1)
+b
+on a.event_time=b.event_time)
+,
+
+data2 as(select event_time,round(sum(price),0) as revenue
+from data
+where event_type='purchase'
+group by event_time
+order by event_time)
+
+
+select
+to_char(event_time,'fmday') as day_name,
+round(avg(total_user),0) as avg_total_user,round(avg(active_user),0) as avg_active_user,
+concat(round(avg(conversion_rate),1),'%') as avg_conversion_rate,round(avg(revenue),0) as avg_revenue
+from
+(select
+a.event_time,a.total_user,a.active_user,a.conversion_rate as conversion_rate,b.revenue
+from data1 a
+join data2 b
+on a.event_time=b.event_time
+order by a.event_time)a
+group by 1
+order by day_name
+```
+****
+```sql
+---usersession
+
+```

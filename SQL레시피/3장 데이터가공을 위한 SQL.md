@@ -145,6 +145,7 @@ else '-'
 end as judge_q1_q2,
 q1-q2 as diff_q2_q1,
 sign(q2-q1) as sign_q2_q1
+---sign(): 양수=1 0=0 음수=-
 from
 quarterly_sales
 order by year

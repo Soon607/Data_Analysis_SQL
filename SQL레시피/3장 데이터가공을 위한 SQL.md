@@ -267,6 +267,7 @@ extract(year from age(birth_date::date)) as current_age,
 extract(year from age(register_stamp::date,birth_date::date)) as register_age
 from mst_users_with_dates
 ```
+ * age()-interval 자료형의 날짜 단위를 리턴, Extract 함수를 통해 year부분만 추출해야 한다.(디폴트로 현재 나이를 리턴하지만, 특정 날짜를 지정하면 해당 날짜에서의 나이를 리턴)
 * 등록 시점과 현재 시점의 나이를 문자열로 계산하는 쿼리
 ```sql
 select

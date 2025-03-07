@@ -297,3 +297,186 @@ cast('127.0.0.1' as inet)>cast('192.168.0.1' as inet) as gt;
 select
 cast('127.0.0.1' as inet)<<cast('127.0.0.0/8' as inet) as is_contained
 ```
+# 7강 하나의 테이블에 대한 조작
+## 1. 그룹의 특징 잡기
+### 테이블 전체의 특징량 계산하기
+```sql
+select
+count(*) as total_count,
+count(distinct user_id) as user_count,
+count(distinct product_id) as product_count,
+sum(score) as sum,
+avg(score) as avg,
+max(score) as max,
+min(score) as min
+from review
+```
+### 그룹핑한 데이터의 특징량 계산하기
+```sql
+select
+user_id,
+count(*) as total_count,
+count(distinct product_id) as product_count,
+sum(score) as sum,
+avg(score) as avg,
+max(score) as max,
+min(score) as min
+from review
+group by user_id
+order by user_id
+```
+### 집약함수를 적용한 값과 집약 전의 값을 동시에 다루기
+```sql
+--- 개별 리뷰 점수&사용자 평균 리뷰 점수의 차이 구하기
+select
+user_id,
+product_id,
+score,
+avg(score) over() avg_score,
+avg(score) over(partition by user_id) as user_avg_score,
+score-avg(score) over(partition by user_id) as user_avg_score_dff
+from review
+order by user_id
+```
+## 2. 그룹 내부의 순서
+### ORDER BY 구문으로 순서 정의하기
+* ROW_NUMBER: 순서에 따라 유일한 순위 번호를 붙이는 함수
+* RANK: 같은 순위의 레코드가 있을때 순위 번호를 같게 붙인다.(같은 순위의 레코드 뒤의 순위번호를 건너뛴다.)
+* DENSE_RANK: 같은 순위의 레코드가 있을때 순위 번호를 같게 붙인다.(순위 번호를 건너뛰지 않는다.)
+```sql
+select
+product_id,
+score,
+row_number() over (order by score desc) as row,
+rank() over (order by score desc) as rank,
+dense_rank() over (order by score desc) as dense_rank,
+lag(product_id) over(order by score desc) as lag1,
+lag(product_id,2) over(order by score desc) as lag2,
+lead(product_id) over(order by score desc) as lead1,
+lead(product_id,2) over(order by score desc) as lead2
+from popular_products
+order by row
+```
+ * lag(): 현재 행보다 앞에 있는 행의 값 추출하기
+ * lead(): 현재 행보다 뒤에 있는 행의 값 추출하기
+### ORDER BY 구문과 집약 함수 조합하기
+```sql
+select
+product_id,
+score,
+row_number() over (order by score desc) as row,
+sum(score) over(order by score desc rows between unbounded preceding and current row) as cum_score,
+avg(score) over(order by score desc rows between 1 preceding and 1 following) as local_avg,
+first_value(product_id) over(order by score desc rows between unbounded preceding and unbounded following) as first_value,
+last_value(product_id) over (order by score desc rows between unbounded preceding and unbounded following) as last_value
+from popular_products
+order by row
+```
+ * First_Value() & Last_Value(): 각각 윈도 내부의 가장 첫 번째 레코드와 가장 마지막 레코드를 추출해주는 함수
+#### 윈도 프레임 지정
+**프레임 지정**: 현재 레코드 위치를 기반으로 상대적인 윈도를 정의하는 구문
+* ROWS BETWEEN start AND end: start와 end에는 아래의 키워드들을 지정
+ * CURRENT ROW: 현재의 행
+ * n PRECEDING: n행 앞
+ * n FOLLOWING: n행 뒤
+ * UNBOUNDED PRECEDING: 이전 행 전부
+ * UNBOUNDED FOLLOWING: 이후 행 전부
+```sql
+select
+product_id,
+row_number() over (order by score desc) as row,
+array_agg(product_id) over (order by score desc rows between unbounded preceding and unbounded following) as whole_agg,
+array_agg(product_id) over (order by score desc rows between unbounded preceding and current row) as cum_agg,
+array_agg(product_id) over (order by score desc rows between 1 preceding and 1 following) as local_agg
+from popular_products
+where category='action'
+order by row
+```
+ * array_agg(): 집약쿼리
+### PARTITION BY & ORDER BY 조합하기
+```sql
+--- 카테고리들의 순위를 계산하는 쿼리
+select
+category,
+product_id,
+score,
+row_number() over(partition by category order by score desc) as row,
+rank() over(partition by category order by score desc) as rank,
+dense_rank() over(partition by category order by score desc) as dense_rank
+from popular_products
+order by category, row
+```
+#### 각 카테고리의 상위 n개 추출하기
+```sql
+select
+*
+from
+(select
+category,
+product_id,
+score,
+row_number() over(partition by category order by score desc) as rank
+from popular_products) as popular_products_with_rank
+where rank<=2
+order by category,rank
+```
+#### 카테고리별 순위 순서에서 상위 1개의 상품 ID 추출하기
+```
+sql
+select
+distinct category,
+first_value(product_id) over(partition by category order by score desc
+							rows between unbounded preceding and unbounded following) as product_id
+from popular_products
+```
+## 3. 세로 기반 데이터를 가로 기반으로 변환하기
+### 행을 열로 변환하기
+```sql
+select
+dt,
+max(case when indicator='impressions' then val end) as impressions,
+max(case when indicator='sessions' then val end) as sessions,
+max(case when indicator='users' then val end) as users
+from daily_kpi
+group by dt
+order by dt
+```
+### 행을 쉼표로 구분한 문자열로 집약하기
+위의 방법은 미리 열의 종류와 수를 알고 있을 때만 사용가능                  
+따라서 반대로 열의 종류와 수를 모른다면 사용할 수 없다.                       
+미리 열의 수를 정할 수 없는 경우에는 데이터를 쉼표 등으로 구분한 문자열로 변환하는 방법을 생각해볼 수 있다.            
+```sql
+select
+purchase_id,
+string_agg(product_id,',') as product_ids,
+sum(price) as price
+from purchase_detail_log
+group by purchase_id
+order by purchase_id
+```
+## 4. 가로 기반 데이터를 세로 기반으로 변환하기
+### 열로 표현된 값을 행으로 변환하기
+컬럼으로 표현된 가로 기반 데이터의 특징은 **데이터의 수가 고정**되어 있다는 것                     
+행으로 전개 할 데이터 수가 고정되었다면, 그러한 데이터 수와 같은 수의 일련 번호를 가진 피벗 테이블을 만들고 CROSS JOIN하면 된다.
+```sql
+select
+q.year,
+case
+when p.idx=1 then 'q1'
+when p.idx=2 then 'q2'
+when p.idx=3 then 'q3'
+when p.idx=4 then 'q4'
+end as quarter,
+case
+when p.idx=1 then q.q1
+when p.idx=2 then q.q2
+when p.idx=3 then q.q3
+when p.idx=4 then q.q4
+end as sales
+from quarterly_sales as q
+cross join 
+(select 1 as idx
+union all select 2 as idx
+union all select 3 as idx
+union all select 4 as idx)as p
+```

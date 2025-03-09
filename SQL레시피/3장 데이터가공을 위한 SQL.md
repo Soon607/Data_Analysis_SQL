@@ -480,3 +480,198 @@ union all select 2 as idx
 union all select 3 as idx
 union all select 4 as idx)as p
 ```
+# 8강 여러 개의 테이블 조작하기
+## 1. 여러 개의 테이블을 세로로 결합하기
+* 비슷한 구조를 가지는 테이블의 데이터를 일괄 처리하고 싶은 경우, **UNION ALL** 구문을 사용해 여러 개의 테이블을 세로로 결합한다.
+  * 결합시에는 테이블의 컬럽이 완전히 일치해야 한다.
+```sql
+select
+'app1' as app_name, user_id, name, email from app1_mst_users
+union all 
+select
+'app2' as app_name, user_id, name, null as email from app2_mst_users
+```
+## 2. 여러 개의 테이블을 가로로 정렬하기
+* 여러 개의 테이블을 가로로 정렬하여 데이터를 비교하거나 값을 조합하고 싶은 경우 **JOIN**을 사용한다.
+  다만 마스터 테이블에 **JOIN**을 사용하면 결합하지 못한 데이터가 사라지거나, 반대로 중복된 데이터가 발생할 수 있다.
+```sql
+select
+m.category_id,m.name,s.sales,r.product_id as sale_product
+from mst_categories as m
+join 
+category_sales as s
+on m.category_id=s.category_id
+join
+product_sale_ranking as r
+on m.category_id=r.category_id
+```
+* 테이블을 category ID로 단순하게 결합한 결과
+  * 카테고리 마스터에 존재하는 book 카테고리가 결합하지 못해서 여러 개의 상품 데이터가 사라졌다.
+  * 여러 개의 상품 ID가 부여된 DVD/CD 카테고리는 가격이 중복되어 출력되고 있다.
+* 마스터 테이블의 행 수를 변경하지 않고 데이터를 가로 정렬하려면, **LEFT JOIN**을 사용하여 결합하지 못한 레코드를 유지한 상태로, 결합할 레코드가 반드시 1개 이하가 되게하는 조건을 사용해야 한다.
+```sql
+select
+m.category_id,m.name,s.sales,r.product_id as top_sale_product
+from mst_categories as m
+left join 
+category_sales as s
+on m.category_id=s.category_id
+left join
+product_sale_ranking as r
+on m.category_id=r.category_id
+and r.rank=1
+```
+* 상관 서브쿼리를 통해 위와 같은 결과를 내는 코드짜기
+```sql
+select
+m.category_id,
+m.name,
+(select s.sales
+	from category_sales as s
+where m.category_id=s.category_id) as sales,
+(select r.product_id from product_sale_ranking as r
+where m.category_id=r.category_id
+order by sales desc
+limit 1)
+from mst_categories as m
+```
+## 3. 조건 플래그를 0과 1로 표현하기
+* 마스터 테이블에 다양한 데이터를 집약하고, 마스터 테이블의 속성 조건을 0 또는 1이라는 플래그로 표현하기
+```sql
+select
+m.user_id,m.card_number,
+count(p.user_id) as purchase_count,
+case
+when m.card_number is not null then 1
+else 0 end as has_card,
+sign(count(p.user_id)) as has_purchased
+from mst_users_with_card_number as m
+left join 
+purchase_log as p
+on m.user_id=p.user_id
+group by m.user_id,m.card_number
+order by user_id;
+```
+* CASE 식과 SIGN 함수를 통해 신용카드 등록과 구매 이력 유무를 0과 1이라는 플래그로 나타내는 쿼리
+  * 신용 카드 번호를 등록하지 않은 경우, card_number 컬럼의 값이 null이므로, case 식을 사용해서 null이 아닐 경우에는 1, null이라면 0으로 변환
+## 4. 계산한 테이블에 이름 붙여 재사용하기 
+복잡한 처리를 하는 SQL문을 작성할 때는 서브 쿼리의 중첩이 많아진다. 비슷한 처리를 여러번 하는 경우, 쿼리의 가독성이 굉장히 낮아진다.                      
+이와 같은 문제를 일시적인 테이블에 이름을 붙여 재사용하게 만들어주는 **공통 테이블 식(CTE: Common Table Expression)** 을 통해 해결할 수 있다.
+* CTE 구문을 사용해 만들어진 테이블에 product_sale_ranking이라는 이름을 붙이는 쿼리
+```sql
+with
+product_sale_ranking as(
+select
+	category_name,
+	product_id,
+	sales,
+	row_number() over (partition by category_name order by sales desc) as rank
+from product_sales)
+
+select * from product_sale_ranking
+```
+* 카테고리들의 순위에서 유니크한 순위 목록을 계산하는 쿼리
+```sql
+with
+product_sale_ranking as(
+select
+	category_name,
+	product_id,
+	sales,
+	row_number() over (partition by category_name order by sales desc) as rank
+from product_sales),
+
+mst_rank as(
+	select
+	distinct rank
+from product_sale_ranking
+order by rank)
+
+select * from mst_rank
+```
+* 카테고리별로 순위를 가로로 넓게 출력하는 쿼리
+```sql
+with
+product_sale_ranking as(
+select
+	category_name,
+	product_id,
+	sales,
+	row_number() over (partition by category_name order by sales desc) as rank
+from product_sales),
+
+mst_rank as(
+	select
+	distinct rank
+from product_sale_ranking
+order by rank)
+
+select
+m.rank,
+r1.product_id as dvd,
+r1.sales as dvd_sales,
+r2.product_id as cd,
+r2.sales as cd_sales,
+r3.product_id as book,
+r3.sales as book_sales
+from mst_rank as m
+left join
+product_sale_ranking as r1
+on m.rank=r1.rank and r1.category_name='dvd'
+left join
+product_sale_ranking as r2
+on m.rank=r2.rank and r2.category_name='cd'
+left join
+product_sale_ranking as r3
+on m.rank=r3.rank and r3.category_name='book'
+order by m.rank
+```
+## 5. 유사 테이블 만들기
+테이블 생성 권한 없이 유사테이블을 만들어 테스트와 작업 효율을 크게 향상 시킬 수 있다.
+### 임의의 레코드를 가진 유사 테이블 만들기
+* select 구문으로 유사 테이블을 만드는 방법
+```sql
+with mst_devices as (
+select 1 as device_id, 'PC' as device_name
+union all select 2 as device_id, 'SP' as device_name
+union all select 3 as device_id, 'APPLICATION' as device_name )
+
+select * from mst_devices
+```
+* 만들어진 유사 테이블을 다른 테이블과 집계하기
+```sql
+with mst_devices as (
+select 1 as device_id, 'PC' as device_name
+union all select 2 as device_id, 'SP' as device_name
+union all select 3 as device_id, 'APPLICATION' as device_name )
+
+select
+u.user_id, d.device_name
+from mst_users as u
+left join
+mst_device as d
+on u.register_device=d.device_id
+```
+### VALUES 구문을 사용한 유사 테이블 만들기
+* INSERT 구문 이외에도 VALUES 구문을 사용해 레코드를 만들 수 있다.
+```sql
+with
+mst_devices(device_id,device_name) as(
+values
+(1,'PC'),
+(2,'SP'),
+(3,'APPLICATION'))
+SELECT * FROM
+mst_devices
+```
+### 순번을 사용해 테이블 작성하기
+레코드의 수가 다르면, 테이블 작성과 쿼리 관리가 귀찮아진다.                        
+순번을 자동 생성하는 테이블 함수를 통해서 임의의 레코드 수를 가진 유사 테이블도 쉽게 만들 수 있다.
+* generate_series 함수를 통해서 순번을 가진 유사 테이블 작성하기
+```sql
+with
+series as(
+select generate_series(1,5) as idx)
+
+select * from series
+```

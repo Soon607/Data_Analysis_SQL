@@ -20,7 +20,9 @@ Calculating the **cumulative distribution** of a value within a set of values (R
 * `Return` value: A double precision value (0 < `cume_dist()` <= 1)
 ## Examples
 * Dataset
-![Dataset](<img width="802" height="264" alt="Image" src="https://github.com/user-attachments/assets/d15f2132-6d55-4e00-9da3-c23d6110b54e" />)          
+<img width="802" height="264" alt="Image" src="https://github.com/user-attachments/assets/d15f2132-6d55-4e00-9da3-c23d6110b54e" />
+
+     
 * Using `cume_dist()
 ```sql
 SELECT
@@ -35,6 +37,8 @@ FROM
 WHERE
     year = 2018;
 ```
+
+
 * Output
-![Dataset](<img width="1002" height="560" alt="Image" src="https://github.com/user-attachments/assets/8fe26f13-2b44-404e-afd8-7f3a73295df3" />)
+<img width="1002" height="560" alt="Image" src="https://github.com/user-attachments/assets/8fe26f13-2b44-404e-afd8-7f3a73295df3" />
 
